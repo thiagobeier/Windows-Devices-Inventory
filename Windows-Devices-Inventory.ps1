@@ -280,12 +280,10 @@ if ($Hybrid) {
 			# Create Custom Object with Formatted Columns and Names
 			$FormattedDevice = [PSCustomObject]@{
 				DeviceName               = $Device.Name
-				OnPremID                 = $Device.ObjectGUID
-				BULC                     = $BULC
+				ObjectGUID                 = $Device.ObjectGUID
 				DN                       = $Device.DistinguishedName
 				OS                       = ""
 				Enabled                  = $Device.Enabled
-				NamingError              = ""
 				AzureADStatus            = ""
 				AzureADID                = ""
 				IntuneStatus             = ""
@@ -294,7 +292,7 @@ if ($Hybrid) {
 			}
 		}
 		catch {
-			"Could not get BULC for $Device.DeviceName" | Out-File -FilePath $LogFile -Append
+			"Could not load data for $Device.DeviceName" | Out-File -FilePath $LogFile -Append
 		}
     
 		# Add Formatted Device to Array
@@ -305,21 +303,6 @@ if ($Hybrid) {
 
 	#Endregion
 
-	foreach ($FormattedDevice in $global:FormattedNonServerPremDevices) {
-		if ($null -ne $FormattedDevice.DeviceName -and $FormattedDevice.DeviceName.ToUpper().StartsWith($FormattedDevice.BULC)) {
-			$FormattedDevice.NamingError = "False"
-		}
-		else {
-			if ($null -ne $FormattedDevice) {
-				$FormattedDevice.NamingError = "True"
-			}
-		}
-	}
-
-	#Endregion
-	#$global:FormattedNonServerPremDevices.count
-
-	#EndRegion
 
 	#Region : Azure AD Check
 
@@ -336,12 +319,12 @@ if ($Hybrid) {
 		$AzureADProgressPercent = [math]::Round(($AzureADProgressCount / $global:FormattedNonServerPremDevices.Count) * 100)
 		Write-Progress -Activity "Checking Azure AD" -Status "$AzureADProgressPercent% Complete" -PercentComplete $AzureADProgressPercent
 
-		# Look for a match based on DeviceName and OnPremID
-		$AzureADDevice = $global:AllAADDevicesList | Where-Object { $_.DisplayName -eq $FormattedDevice.DeviceName -and $_.DeviceID -eq $FormattedDevice.OnPremID }
+		# Look for a match based on DeviceName and ObjectGUID
+		$AzureADDevice = $global:AllAADDevicesList | Where-Object { $_.DisplayName -eq $FormattedDevice.DeviceName -and $_.DeviceID -eq $FormattedDevice.ObjectGUID }
 		# Check if a match was found and update entry
 		if ($null -ne $AzureADDevice) {
 			#write-host "Host found $($FormattedDevice.DeviceName)"
-			#$AADDevice = $global:AllIntuneDevicesList | Where-Object { $_.azureADDeviceId -eq $FormattedDevice.OnPremID }
+			#$AADDevice = $global:AllIntuneDevicesList | Where-Object { $_.azureADDeviceId -eq $FormattedDevice.ObjectGUID }
 			#$AADDevice
 			$FormattedDevice.AzureADStatus = "Found"
 			$FormattedDevice.AzureADID = $AzureADDevice.Id
@@ -362,12 +345,12 @@ if ($Hybrid) {
 	# Loop through each device and check if its found in intune
 	foreach ($FormattedDevice in $global:FormattedNonServerPremDevices) {
 
-		# Look for a match based on DeviceName and OnPremID
-		# Match devices based on Intune ID (AzureAADDeviceId), with OnPremID
-		if ($null -ne $FormattedDevice -and $global:AllIntuneDevicesList.azureADDeviceId -contains $FormattedDevice.OnPremID) {
+		# Look for a match based on DeviceName and ObjectGUID
+		# Match devices based on Intune ID (AzureAADDeviceId), with ObjectGUID
+		if ($null -ne $FormattedDevice -and $global:AllIntuneDevicesList.azureADDeviceId -contains $FormattedDevice.ObjectGUID) {
 			# Update FormattedDevice Entry
 			$FormattedDevice.IntuneStatus = "Found"
-			$IntuneDevice = $global:AllIntuneDevicesList | Where-Object { $_.azureADDeviceId -eq $FormattedDevice.OnPremID }
+			$IntuneDevice = $global:AllIntuneDevicesList | Where-Object { $_.azureADDeviceId -eq $FormattedDevice.ObjectGUID }
 			$FormattedDevice.IntuneSerialNumber = $IntuneDevice.SerialNumber
 		}
 		else {
@@ -381,7 +364,7 @@ if ($Hybrid) {
 	# Loop through each device and check if its found in windows autopilot devices (hash/serial)
 	foreach ($FormattedDevice in $global:FormattedNonServerPremDevices) {
     
-		# Match devices based on Intune ID (AzureAADDeviceId), with OnPremID
+		# Match devices based on Intune ID (AzureAADDeviceId), with ObjectGUID
 		if ($null -ne $FormattedDevice -and $global:AllWinAutopilotDevicesList.SerialNumber -contains $FormattedDevice.IntuneSerialNumber) {
 			# Update FormattedDevice Entry
 			$FormattedDevice.WinAutopilotSerialNumber = "Found"
